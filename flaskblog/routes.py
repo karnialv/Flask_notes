@@ -10,8 +10,8 @@ from flaskblog.models import User, Post
 from flask_login import login_user, current_user, logout_user, login_required
 from datetime import datetime, timedelta
 from flaskblog.crypted_post import decrypt, encrypt
-
-
+from Crypto.Random import get_random_bytes
+from sqlalchemy import or_, and_
 
 
 
@@ -122,8 +122,9 @@ def new_post():
         post = Post(title=form.title.data, content=form.content.data, author=current_user)
 
         if form.encrypted.data and form.password.data:
+            post.iv = get_random_bytes(8)
             if bcrypt.check_password_hash(current_user.password, form.password.data):
-                post.content = encrypt(form.password.data, form.content.data, current_user.username)
+                post.content = encrypt(post.iv, form.password.data, form.content.data, current_user.username)
                 post.encrypted = True
             else:
                 flash('Invalid password', 'danger')
@@ -142,7 +143,7 @@ def post(post_id):
     form = PasswordPost()
     if form.validate_on_submit():
         if post.encrypted and bcrypt.check_password_hash(current_user.password, form.password.data):
-            decrypted = decrypt(form.password.data, post.content, current_user.username)
+            decrypted = decrypt(post.iv, form.password.data, post.content, current_user.username)
             post.content = decrypted
     return render_template('post.html', title=post.title, post=post, form=form)
 
